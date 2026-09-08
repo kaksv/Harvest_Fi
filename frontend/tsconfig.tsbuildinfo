@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/forwardcontractcard.tsx","./src/components/header.tsx","./src/components/registerpage.tsx","./src/hooks/usecontracts.ts","./src/hooks/usegeolocation.ts","./src/hooks/useinvest.ts","./src/hooks/useregister.ts","./src/lib/abis.ts","./src/lib/wagmi.ts"],"version":"5.9.3"}
