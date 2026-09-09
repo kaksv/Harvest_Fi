@@ -7,6 +7,7 @@ export default {
         harvest: {
           green:  "#2D6A4F",
           amber:  "#D4A017",
+          "amber-light": "#E1AE24",
           cream:  "#F5F0E8",
           brown:  "#5C3317",
         },

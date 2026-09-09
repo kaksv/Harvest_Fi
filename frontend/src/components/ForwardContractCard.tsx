@@ -55,20 +55,20 @@ export function ForwardContractCard({ fc }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-harvest-cream flex flex-col overflow-hidden hover:shadow-md transition">
+    <div className="card-lift flex flex-col overflow-hidden border border-harvest-brown/10 bg-white shadow-sm hover:border-harvest-green/30 hover:shadow-md">
 
       {/* Colour band + status */}
-      <div className={`px-5 pt-5 pb-4 ${STATUS_BG[fc.status]}`}>
+      <div className={`border-b border-black/5 px-5 pb-5 pt-5 ${STATUS_BG[fc.status]}`}>
         <div className="flex justify-between items-start mb-3">
           <div>
-            <p className="text-xs text-gray-400 font-mono mb-0.5">Contract #{String(fc.id)}</p>
-            <p className="text-sm font-bold text-harvest-brown">
+            <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.12em] text-gray-500">Forward #{String(fc.id)}</p>
+            <p className="font-serif text-lg font-bold text-harvest-brown">
               {fc.metadataCID.startsWith("{")
                 ? (() => { try { return JSON.parse(fc.metadataCID).crop + " Harvest"; } catch { return "Crop Harvest"; } })()
                 : "Crop Harvest"}
             </p>
           </div>
-          <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full bg-white ${STATUS_COLOR[fc.status]}`}>
+          <span className={`text-xs font-bold uppercase tracking-wide ${STATUS_COLOR[fc.status]}`}>
             {STATUS[fc.status]}
           </span>
         </div>
@@ -76,14 +76,14 @@ export function ForwardContractCard({ fc }: Props) {
         {/* APY + days pills */}
         {fc.status === 0 && (
           <div className="flex gap-2">
-            <span className="text-xs font-bold bg-harvest-green text-white px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold bg-harvest-green px-2.5 py-1 text-white">
               {apyDisplay}
             </span>
-            <span className="text-xs font-semibold bg-white text-harvest-brown border border-harvest-cream px-2.5 py-1 rounded-full">
+            <span className="border border-harvest-brown/15 bg-white px-2.5 py-1 text-xs font-semibold text-harvest-brown">
               {returnPct} in {daysLeft}d
             </span>
-            <span className="text-xs text-gray-400 bg-white border border-harvest-cream px-2.5 py-1 rounded-full">
-              ⏳ {daysLeft} days left
+            <span className="border border-harvest-brown/10 bg-white px-2.5 py-1 text-xs text-gray-500">
+              {daysLeft} days left
             </span>
           </div>
         )}
@@ -92,12 +92,12 @@ export function ForwardContractCard({ fc }: Props) {
       <div className="px-5 pb-5 flex flex-col gap-4 flex-1">
         {/* Progress */}
         <div>
-          <div className="flex justify-between text-xs text-gray-500 mb-1 mt-3">
-            <span className="font-semibold text-harvest-green">${formatUnits(fc.raisedAmount, 6)} raised</span>
+          <div className="mb-1 mt-3 flex justify-between text-xs text-gray-500">
+            <span className="font-mono font-semibold text-harvest-green">${formatUnits(fc.raisedAmount, 6)} raised</span>
             <span>${formatUnits(fc.targetAmount, 6)} goal</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-harvest-green transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-2 overflow-hidden bg-gray-100">
+            <div className="h-full bg-harvest-green transition-[width] duration-200" style={{ width: `${pct}%` }} />
           </div>
           <div className="flex justify-between text-xs text-gray-400 mt-1">
             <span>{pct}% funded</span>
@@ -107,7 +107,7 @@ export function ForwardContractCard({ fc }: Props) {
 
         {/* Deadline */}
         <div className="flex justify-between text-xs text-gray-500 border-t border-gray-50 pt-3">
-          <span>📅 Delivery deadline</span>
+            <span>Delivery deadline</span>
           <span className="font-semibold">{deadline}</span>
         </div>
 
@@ -121,12 +121,13 @@ export function ForwardContractCard({ fc }: Props) {
                 placeholder="USDC amount"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-harvest-green"
+                aria-label="USDC investment amount"
+                className="min-h-11 flex-1 border border-gray-200 px-3 py-2 text-sm focus:border-harvest-green focus:outline-none"
               />
               <button
                 onClick={handleInvest}
                 disabled={isWriting || !amount}
-                className="bg-harvest-green text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 hover:bg-opacity-90 transition whitespace-nowrap"
+                className="min-h-11 bg-harvest-green px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-harvest-brown disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isWriting ? "Confirming…" : "Invest"}
               </button>
@@ -135,7 +136,7 @@ export function ForwardContractCard({ fc }: Props) {
             {/* Live return preview */}
             {expectedReturn && (
               <p className="text-xs text-harvest-green font-semibold text-center bg-green-50 rounded-lg py-1.5">
-                💸 Expected return: {expectedReturn}
+                Expected return: {expectedReturn}
               </p>
             )}
           </div>

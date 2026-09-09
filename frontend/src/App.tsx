@@ -10,8 +10,8 @@ type View = "home" | "register";
 
 function StatPill({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="flex flex-col items-center bg-white/10 rounded-2xl px-6 py-4 min-w-[120px]">
-      <p className="text-2xl font-bold text-white">{value}</p>
+    <div className="flex min-w-[120px] flex-col items-center bg-white/10 px-5 py-4">
+      <p className="font-mono text-2xl font-bold tabular-nums text-white">{value}</p>
       <p className="text-xs font-semibold text-white/80 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-white/50 mt-0.5">{sub}</p>}
     </div>
@@ -26,26 +26,21 @@ function Hero({ onRegister, totalRaised, activeCount, avgApy }: {
 }) {
   const { authenticated, login } = usePrivy();
   return (
-    <div className="bg-harvest-green rounded-3xl px-5 py-10 mb-10 text-center relative overflow-hidden">
-      {/* background texture */}
-      <div className="absolute inset-0 opacity-5 pointer-events-none select-none text-[120px] leading-none flex flex-wrap gap-4 overflow-hidden">
-        {Array.from({ length: 24 }).map((_, i) => <span key={i}>🌱</span>)}
-      </div>
-
-      <div className="relative">
-        <span className="inline-block bg-harvest-amber text-harvest-brown text-xs font-bold px-3 py-1 rounded-full mb-4 uppercase tracking-wide">
-          Real World Assets · Base Sepolia
+    <div className="relative mb-12 overflow-hidden bg-harvest-green px-6 py-10 text-left sm:px-10 sm:py-14">
+      <div className="absolute -right-24 -top-28 h-80 w-80 rounded-full border-[42px] border-harvest-amber/20" aria-hidden="true" />
+      <div className="relative max-w-3xl">
+        <span className="mb-5 inline-flex border-l-2 border-harvest-amber pl-3 text-xs font-bold uppercase tracking-[0.18em] text-harvest-amber">
+          Real-world harvest finance
         </span>
-        <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight mb-3">
-          Earn yield by funding<br />Ugandan crop harvests
+        <h1 className="max-w-2xl font-serif text-4xl font-bold leading-[1.04] text-white sm:text-6xl">
+          Fund the harvest.<br />Share the upside.
         </h1>
-        <p className="text-white/70 text-sm sm:text-base max-w-lg mx-auto mb-8">
-          Invest USDC into tokenised forward contracts for coffee & vanilla.
-          Farmers get upfront capital. You get repaid with yield when the crop is delivered.
+        <p className="mb-9 mt-5 max-w-xl text-sm leading-6 text-white/70 sm:text-base">
+          Back verified coffee and vanilla harvests in Uganda with USDC. Farmers receive working capital upfront; investors receive a transparent claim on settlement.
         </p>
 
         {/* Stats */}
-        <div className="flex flex-wrap justify-center gap-3 mb-8">
+        <div className="mb-9 grid max-w-2xl grid-cols-2 gap-px overflow-hidden border border-white/15 bg-white/15 sm:grid-cols-4">
           <StatPill label="Total Raised"    value={`$${totalRaised}`} sub="USDC" />
           <StatPill label="Active Rounds"   value={String(activeCount)} />
           <StatPill label="Est. APY"        value={avgApy} sub="annualised" />
@@ -55,16 +50,16 @@ function Hero({ onRegister, totalRaised, activeCount, avgApy }: {
         {!authenticated ? (
           <button
             onClick={login}
-            className="bg-harvest-amber text-harvest-brown font-bold px-8 py-3 rounded-full text-sm hover:opacity-90 transition shadow-lg"
+            className="min-h-11 bg-harvest-amber px-6 py-3 text-sm font-bold text-harvest-brown shadow-lg transition-colors hover:bg-harvest-amber-light"
           >
-            Connect Wallet to Invest →
+            Connect wallet to invest
           </button>
         ) : (
           <button
             onClick={onRegister}
-            className="bg-white/10 border border-white/20 text-white font-semibold px-6 py-2.5 rounded-full text-sm hover:bg-white/20 transition"
+            className="min-h-11 border border-white/25 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/20"
           >
-            🧑🌾 Are you a farmer? Register your harvest
+            Register your harvest
           </button>
         )}
       </div>
@@ -81,14 +76,19 @@ function HowItWorks() {
     { emoji: "💸",   title: "You get repaid",         body: "Burn tokens, receive USDC + yield pro-rata" },
   ];
   return (
-    <div className="mb-10">
-      <h2 className="text-base font-bold text-gray-700 mb-4">How it works</h2>
+    <div className="mb-12">
+      <div className="mb-5 flex items-end justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-harvest-green/60">The model</p>
+          <h2 className="mt-1 font-serif text-2xl font-bold text-harvest-brown">A better path from field to finance</h2>
+        </div>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {steps.map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-harvest-cream p-4 flex flex-col items-center text-center gap-2">
-            <span className="text-2xl">{s.emoji}</span>
-            <p className="text-xs font-bold text-harvest-green">{s.title}</p>
-            <p className="text-xs text-gray-400 leading-snug">{s.body}</p>
+          <div key={i} className="border-t-2 border-harvest-green/20 bg-white/60 p-4 text-left">
+            <span className="font-mono text-xs font-bold text-harvest-amber">0{i + 1}</span>
+            <p className="mt-4 text-sm font-bold text-harvest-green">{s.title}</p>
+            <p className="mt-2 text-xs leading-5 text-gray-500">{s.body}</p>
           </div>
         ))}
       </div>
@@ -98,9 +98,9 @@ function HowItWorks() {
 
 function FarmerBanner({ onClick }: { onClick: () => void }) {
   return (
-    <div className="mt-12 bg-harvest-cream rounded-3xl px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+    <div className="mt-14 flex flex-col items-start justify-between gap-6 border-y border-harvest-brown/15 py-8 sm:flex-row sm:items-center">
       <div>
-        <p className="text-lg font-bold text-harvest-brown">Are you a farmer cooperative?</p>
+        <p className="font-serif text-2xl font-bold text-harvest-brown">Are you a farmer cooperative?</p>
         <p className="text-sm text-gray-600 mt-1 max-w-md">
           Tokenise your upcoming harvest and receive USDC working capital upfront —
           no bank, no loan shark, no collateral required.
@@ -108,9 +108,9 @@ function FarmerBanner({ onClick }: { onClick: () => void }) {
       </div>
       <button
         onClick={onClick}
-        className="shrink-0 bg-harvest-green text-white font-bold px-7 py-3 rounded-full text-sm hover:opacity-90 transition whitespace-nowrap"
+        className="min-h-11 shrink-0 bg-harvest-green px-7 py-3 text-sm font-bold text-white transition-colors hover:bg-harvest-brown"
       >
-        🌱 Register Your Harvest →
+        Register your harvest
       </button>
     </div>
   );
@@ -160,10 +160,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="page-enter min-h-screen font-sans">
       <Header onRegister={() => setView("register")} />
 
-      <main className="max-w-6xl mx-auto px-2 sm:px-3 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         <Hero
           onRegister={() => setView("register")}
           totalRaised={totalRaisedFmt}
