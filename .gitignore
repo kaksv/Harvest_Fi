@@ -1,4 +1,5 @@
 .env
+frontend/.env.local
 out/
 cache/
 frontend/node_modules/

@@ -18,32 +18,35 @@ import "../src/HarvestPool.sol";
 ///   DEPLOYER_PRIVATE_KEY   — deployer wallet
 ///   ADMIN_ADDRESS          — multisig / admin wallet that owns the pool
 ///   USDC_ADDRESS           — Base Sepolia USDC: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
-///   CHAINLINK_FEED_ADDRESS — ETH/USD on Base Sepolia (coffee placeholder):
-///                            0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
+///   COFFEE_PRICE_PER_KG_USDC — initial coffee price in USDC's 6-decimal units per kg
+///   VANILLA_PRICE_PER_KG_USDC — initial vanilla price in USDC's 6-decimal units per kg
 ///   BASE_SEPOLIA_RPC_URL   — e.g. https://sepolia.base.org
 ///   BASESCAN_API_KEY       — from basescan.org
 contract DeployHarvestPool is Script {
     function run() external {
-        address admin    = vm.envAddress("ADMIN_ADDRESS");
-        address usdc     = vm.envAddress("USDC_ADDRESS");
-        address feed     = vm.envAddress("CHAINLINK_FEED_ADDRESS");
+        address admin = vm.envAddress("ADMIN_ADDRESS");
+        address usdc = vm.envAddress("USDC_ADDRESS");
+        uint256 coffeePricePerKgUSDC = vm.envUint("COFFEE_PRICE_PER_KG_USDC");
+        uint256 vanillaPricePerKgUSDC = vm.envUint("VANILLA_PRICE_PER_KG_USDC");
 
         vm.startBroadcast();
 
-        // 1. Deploy the crop price oracle (ETH/USD as coffee placeholder)
-        CropPriceOracle oracle = new CropPriceOracle(feed);
+        // 1. Deploy separate crop price oracles with explicit USDC/kg prices.
+        CropPriceOracle coffeeOracle = new CropPriceOracle(admin, coffeePricePerKgUSDC);
+        CropPriceOracle vanillaOracle = new CropPriceOracle(admin, vanillaPricePerKgUSDC);
 
         // 2. Deploy the pool
         HarvestPool pool = new HarvestPool(usdc, admin);
 
-        // 3. Register oracle for hCOFFEE and hVANILLA (both point to same feed on testnet)
-        pool.setOracle("hCOFFEE",  address(oracle));
-        pool.setOracle("hVANILLA", address(oracle));
+        // 3. Register the configured demo price for each crop.
+        pool.setOracle("hCOFFEE", address(coffeeOracle));
+        pool.setOracle("hVANILLA", address(vanillaOracle));
 
         vm.stopBroadcast();
 
         // ── Log deployed addresses for the frontend .env ─────────────────────
-        console2.log("CropPriceOracle : ", address(oracle));
+        console2.log("CoffeeOracle    : ", address(coffeeOracle));
+        console2.log("VanillaOracle   : ", address(vanillaOracle));
         console2.log("HarvestPool     : ", address(pool));
         console2.log("USDC            : ", usdc);
         console2.log("Admin           : ", admin);

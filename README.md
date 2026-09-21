@@ -33,7 +33,7 @@ HarvestFi lets cooperatives **tokenise their future harvest** as a Real World As
 
 | Contract | Address |
 |---|---|
-| `HarvestPool` | [`0xbec63Dd50093Bc9E7fF57aBa60aBB96d164C74a1`](https://sepolia.basescan.org/address/0xbec63dd50093bc9e7ff57aba60abb96d164c74a1) |
+| `HarvestPool` | [`0x5C039031A3aB02834D7c6be8d647994E02403262`](https://sepolia.basescan.org/address/0x5c039031a3ab02834d7c6be8d647994e02403262) |
 | `CropPriceOracle` | [`0x7f56A85F2B53969af5679c1Ba479C3944c5a27d9`](https://sepolia.basescan.org/address/0x7f56a85f2b53969af5679c1ba479c3944c5a27d9) |
 | USDC (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
@@ -92,7 +92,7 @@ Status: Funding ──► Settled
 | Chain | [Base](https://base.org) (Sepolia testnet) |
 | Smart Contracts | Solidity 0.8.25 + [Foundry](https://book.getfoundry.sh) |
 | Token Standard | ERC-20 + ERC20Permit (OpenZeppelin v5) |
-| Price Oracle | [Chainlink AggregatorV3](https://docs.chain.link) |
+| Price Oracle | Admin-controlled crop price in USDC/kg (demo; replace with a verified commodity feed in production) |
 | Frontend | Vite + React + TypeScript + Tailwind CSS |
 | Wallet / Auth | [Privy](https://privy.io) (email, Google, embedded wallets) |
 | Chain Reads/Writes | [Wagmi v2](https://wagmi.sh) + [viem](https://viem.sh) |
@@ -176,7 +176,19 @@ Suite result: ok; 12 passed; 0 failed
 
 ### 4. Deploy
 
+Load only the deployment variables before running Foundry. Do not run `source .env`
+while placeholder values such as `<your_privy_app_id>` are still present, because
+the angle brackets are shell syntax.
+
 ```bash
+export DEPLOYER_PRIVATE_KEY="0x..."
+export ADMIN_ADDRESS="0x..."
+export USDC_ADDRESS="0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+export COFFEE_PRICE_PER_KG_USDC="5000000"
+export VANILLA_PRICE_PER_KG_USDC="30000000"
+export BASE_SEPOLIA_RPC_URL="https://sepolia.base.org"
+export BASESCAN_API_KEY="..."
+
 forge script script/DeployHarvestPool.s.sol:DeployHarvestPool \
   --rpc-url $BASE_SEPOLIA_RPC_URL \
   --private-key $DEPLOYER_PRIVATE_KEY \
@@ -254,14 +266,14 @@ Farmers and impact investors in emerging markets are not crypto-native. Privy's 
 **Why inline JSON instead of IPFS CIDs?**
 For the hackathon demo, metadata is stored as an inline JSON string in the `metadataCID` field. This removes the Pinata dependency and keeps the demo self-contained. The field name and architecture are ready for real IPFS CIDs in production — it's a one-line change.
 
-**Why ETH/USD as the coffee price feed?**
-Chainlink does not yet have a native coffee commodity feed on Base Sepolia. The oracle architecture is designed so that a real feed — sourced via a Chainlink External Adapter pointing to ICO coffee price data — can be swapped in by calling `setOracle("hCOFFEE", newAddress)` with zero contract redeployment.
+**How is crop pricing handled in the demo?**
+The demo oracle stores an admin-controlled crop price in USDC's 6-decimal units per kilogram. This avoids treating ETH/USD as a crop price. Production should replace the demo oracle with a signed price source or verified commodity feed.
 
 ---
 
 ## Roadmap
 
-- [ ] Real Chainlink commodity price feed via External Adapter
+- [ ] Verified commodity price feed via signed updates or a Chainlink External Adapter
 - [ ] IPFS proof-of-farm uploads via Pinata
 - [ ] WhatsApp bot deployment (Africa's Talking / Meta Cloud API)
 - [ ] Investor portfolio view with hTOKEN balances + redeem UI

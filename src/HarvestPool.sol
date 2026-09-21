@@ -57,6 +57,7 @@ contract HarvestPool is Ownable, ReentrancyGuard {
     event OffTakerSet(uint256 indexed id, address indexed offTaker);
     event Invested(uint256 indexed id, address investor, uint256 amount);
     event Settled(uint256 indexed id, address offTaker, uint256 amount);
+    event CooperativePaid(uint256 indexed id, address cooperative, uint256 amount);
     event Redeemed(uint256 indexed id, address holder, uint256 tokensBurned, uint256 usdcReturned);
     event Refunded(uint256 indexed id, address holder, uint256 tokensBurned, uint256 usdcReturned);
     event Cancelled(uint256 indexed id);
@@ -204,6 +205,8 @@ contract HarvestPool is Ownable, ReentrancyGuard {
 
         // Redemption opens only after principal plus the fixed premium is escrowed.
         if (fc.settledAmount == requiredAmount) {
+            usdc.safeTransfer(fc.cooperative, fc.raisedAmount);
+            emit CooperativePaid(id, fc.cooperative, fc.raisedAmount);
             fc.status = Status.Settled;
             emit Settled(id, msg.sender, fc.settledAmount);
         }

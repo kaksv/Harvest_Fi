@@ -82,6 +82,7 @@ contract HarvestPoolTest is Test {
     function test_settle_and_redeem() public {
         uint256 id = _create();
         (,, HarvestToken token,,,,,,) = pool.contracts(id);
+        uint256 cooperativeBefore = usdc.balanceOf(cooperative);
 
         vm.prank(investor);
         pool.invest(id, TARGET);
@@ -92,6 +93,8 @@ contract HarvestPoolTest is Test {
 
         (,,,,,,,, HarvestPool.Status status) = pool.contracts(id);
         assertEq(uint8(status), uint8(HarvestPool.Status.Settled));
+        assertEq(usdc.balanceOf(cooperative), cooperativeBefore + TARGET);
+        assertEq(usdc.balanceOf(address(pool)), 1_120e6);
 
         // Investor redeems
         uint256 balBefore = usdc.balanceOf(investor);
