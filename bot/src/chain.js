@@ -17,9 +17,11 @@ const walletClient = createWalletClient({
 
 const POOL_ABI = parseAbi([
   "function createContractByWeight(string name_, string symbol_, uint256 weightGrams, uint256 deadline, string metadataCID) returns (uint256)",
+  "function setOffTaker(uint256 id, address offTaker_)",
 ]);
 
 const POOL_ADDRESS = /** @type {`0x${string}`} */ (process.env.HARVEST_POOL_ADDRESS);
+const OFFTAKER_ADDRESS = /** @type {`0x${string}`} */ (process.env.OFFTAKER_ADDRESS);
 
 /**
  * Deploy a harvest forward contract on-chain on behalf of a cooperative.
@@ -27,6 +29,8 @@ const POOL_ADDRESS = /** @type {`0x${string}`} */ (process.env.HARVEST_POOL_ADDR
  * @returns {Promise<{ txHash: string, contractId: bigint }>}
  */
 export async function createHarvestContract({ name, symbol, weightGrams, deadlineDays, cid }) {
+  if (!OFFTAKER_ADDRESS) throw new Error("OFFTAKER_ADDRESS is not configured");
+
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineDays * 86_400);
 
   const txHash = await walletClient.writeContract({
@@ -42,5 +46,13 @@ export async function createHarvestContract({ name, symbol, weightGrams, deadlin
   const log = receipt.logs.find((l) => l.topics.length > 1);
   const contractId = log ? BigInt(log.topics[1]) : 0n;
 
-  return { txHash, contractId };
+  const offTakerTxHash = await walletClient.writeContract({
+    address:      POOL_ADDRESS,
+    abi:          POOL_ABI,
+    functionName: "setOffTaker",
+    args:         [contractId, OFFTAKER_ADDRESS],
+  });
+  await publicClient.waitForTransactionReceipt({ hash: offTakerTxHash });
+
+  return { txHash, contractId, offTakerTxHash };
 }

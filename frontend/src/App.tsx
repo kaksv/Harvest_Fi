@@ -36,14 +36,14 @@ function Hero({ onRegister, totalRaised, activeCount, avgApy }: {
           Fund the harvest.<br />Share the upside.
         </h1>
         <p className="mb-9 mt-5 max-w-xl text-sm leading-6 text-white/70 sm:text-base">
-          Back verified coffee and vanilla harvests in Uganda with USDC. Farmers receive working capital upfront; investors receive a transparent claim on settlement.
+          Back verified coffee and vanilla harvests in Uganda with USDC. Funds stay in escrow until delivery; investors receive a transparent claim on settlement.
         </p>
 
         {/* Stats */}
         <div className="mb-9 grid max-w-2xl grid-cols-2 gap-px overflow-hidden border border-white/15 bg-white/15 sm:grid-cols-4">
           <StatPill label="Total Raised"    value={`$${totalRaised}`} sub="USDC" />
           <StatPill label="Active Rounds"   value={String(activeCount)} />
-          <StatPill label="Est. APY"        value={avgApy} sub="annualised" />
+          <StatPill label="Settlement premium" value={avgApy} sub="fixed term" />
           <StatPill label="Chain"           value="Base" sub="~$0.001 gas" />
         </div>
 
@@ -71,7 +71,7 @@ function HowItWorks() {
   const steps = [
     { emoji: "🧑🌾", title: "Cooperative registers",  body: "Uploads harvest details & GPS proof-of-farm" },
     { emoji: "🪙",   title: "hTOKEN is minted",       body: "Each token = 1 USDC of the forward contract" },
-    { emoji: "💰",   title: "You invest USDC",        body: "Farmer receives working capital immediately" },
+    { emoji: "💰",   title: "You invest USDC",        body: "Funds are held in protocol escrow" },
     { emoji: "🚚",   title: "Crop is delivered",      body: "Off-taker pays the protocol in USDC" },
     { emoji: "💸",   title: "You get repaid",         body: "Burn tokens, receive USDC + yield pro-rata" },
   ];
@@ -102,8 +102,8 @@ function FarmerBanner({ onClick }: { onClick: () => void }) {
       <div>
         <p className="font-serif text-2xl font-bold text-harvest-brown">Are you a farmer cooperative?</p>
         <p className="text-sm text-gray-600 mt-1 max-w-md">
-          Tokenise your upcoming harvest and receive USDC working capital upfront —
-          no bank, no loan shark, no collateral required.
+          Tokenise your upcoming harvest and connect it to a verified off-taker —
+          no bank, no loan shark, no traditional collateral required.
         </p>
       </div>
       <button
@@ -128,19 +128,7 @@ export default function App() {
   const totalRaised = contracts.reduce((sum, c) => sum + c.raisedAmount, 0n);
   const totalRaisedFmt = Number(formatUnits(totalRaised, 6)).toLocaleString("en-US", { maximumFractionDigits: 0 });
 
-  // Estimated APY: (targetAmount - raisedAmount) / raisedAmount annualised over avg deadline
-  // For the demo we show a fixed representative figure based on typical commodity forward premiums
-  const avgApy = active.length > 0
-    ? (() => {
-        const avgDays = active.reduce((s, c) => {
-          const daysLeft = Math.max(0, Math.floor((Number(c.deadline) - Date.now() / 1000) / 86400));
-          return s + daysLeft;
-        }, 0) / active.length;
-        // Assume 12% annualised commodity forward premium
-        const periodReturn = (12 / 365) * avgDays;
-        return `~${periodReturn.toFixed(1)}%`;
-      })()
-    : "~8–15%";
+  const avgApy = "12%";
 
   if (view === "register") {
     return (

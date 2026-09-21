@@ -7,8 +7,8 @@ const STATUS       = ["Funding", "Settled", "Cancelled"];
 const STATUS_COLOR = ["text-harvest-green", "text-harvest-amber", "text-red-500"];
 const STATUS_BG    = ["bg-green-50", "bg-amber-50", "bg-red-50"];
 
-// Commodity forward premium assumption: 12% annualised
-const ANNUAL_RATE = 0.12;
+// Matches HarvestPool.YIELD_BPS: a fixed 12% settlement premium.
+const SETTLEMENT_PREMIUM = 0.12;
 
 type Props = { fc: ForwardContract };
 
@@ -27,15 +27,13 @@ export function ForwardContractCard({ fc }: Props) {
   const nowSec   = Math.floor(Date.now() / 1000);
   const daysLeft = Math.max(0, Math.floor((Number(fc.deadline) - nowSec) / 86_400));
 
-  // APY derived from days remaining
-  const periodReturn = ANNUAL_RATE * (daysLeft / 365);
-  const apyDisplay   = `${(ANNUAL_RATE * 100).toFixed(0)}% APY`;
-  const returnPct    = `+${(periodReturn * 100).toFixed(1)}%`;
+  const apyDisplay = `${(SETTLEMENT_PREMIUM * 100).toFixed(0)}% premium`;
+  const returnPct  = `+${(SETTLEMENT_PREMIUM * 100).toFixed(0)}%`;
 
   // Expected return on typed amount
   const amountNum     = parseFloat(amount) || 0;
   const expectedReturn = amountNum > 0
-    ? `+$${(amountNum * periodReturn).toFixed(2)} in ${daysLeft}d`
+    ? `+$${(amountNum * SETTLEMENT_PREMIUM).toFixed(2)} at settlement`
     : null;
 
   const deadline = new Date(Number(fc.deadline) * 1000).toLocaleDateString("en-UG", {

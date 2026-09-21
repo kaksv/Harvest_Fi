@@ -1,8 +1,8 @@
 # 🌱 HarvestFi
 
-> **Tokenised crop forwards on Base. Ugandan farmers get USDC upfront. Investors earn yield. No banks. 🌱**
+> **Tokenised crop forwards on Base. Harvest finance stays in escrow until delivery. Investors earn yield. 🌱**
 
-HarvestFi is a decentralised trade finance protocol that tokenises forward contracts for Ugandan cash crops — starting with coffee and vanilla. Farmer cooperatives register their expected harvest on-chain, receive working capital from global investors immediately, and repay them when the crop is delivered to a verified agro-processor.
+HarvestFi is a decentralised trade finance protocol that tokenises forward contracts for Ugandan cash crops — starting with coffee and vanilla. Farmer cooperatives register their expected harvest on-chain, investors fund the contract into escrow, and an approved agro-processor settles it when the crop is delivered.
 
 ---
 
@@ -21,7 +21,7 @@ HarvestFi lets cooperatives **tokenise their future harvest** as a Real World As
 
 1. 🧑🌾 **Cooperative** registers their expected yield (e.g. 500kg of Grade A Arabica Coffee) and deploys a forward contract on Base
 2. 🪙 **Protocol** mints `hTOKENs` (e.g. `hCOFFEE`) — each token represents a proportional claim on the future delivery
-3. 💰 **Investors** buy hTOKENs with USDC — the farmer receives that capital **immediately**, the same block
+3. 💰 **Investors** buy hTOKENs with USDC — funds remain in protocol escrow until settlement
 4. 🚚 **Off-taker** (agro-processor) receives the physical crop at delivery and settles the contract in USDC
 5. 💸 **Investors** burn their hTOKENs and receive USDC pro-rata — principal + yield (~12% APY)
 
@@ -53,10 +53,11 @@ HarvestFi lets cooperatives **tokenise their future harvest** as a Real World As
 │                      HarvestPool.sol                    │
 │                                                         │
 │  createContract()  ──►  deploys HarvestToken (ERC-20)   │
-│  invest()          ──►  mints hTOKENs, forwards USDC    │
-│                         to cooperative immediately      │
-│  settle()          ──►  off-taker pays USDC into escrow │
+│  invest()          ──►  mints hTOKENs, holds USDC       │
+│                         in escrow                       │
+│  settle()          ──►  approved off-taker pays 112%    │
 │  redeem()          ──►  burns hTOKENs, releases USDC    │
+│  refund()          ──►  returns principal if cancelled  │
 └────────────────────────────┬────────────────────────────┘
                              │
               ┌──────────────┴──────────────┐
@@ -78,9 +79,9 @@ Status: Funding ──► Settled
 
 | Status | Description |
 |---|---|
-| `Funding` | Accepting investments, USDC flows to cooperative immediately |
+| `Funding` | Accepting investments, USDC is held in escrow |
 | `Settled` | Off-taker has paid, investors can redeem |
-| `Cancelled` | Admin cancelled post-deadline, no new investments |
+| `Cancelled` | Admin cancelled an underfunded round post-deadline, token holders can refund |
 
 ---
 
@@ -110,7 +111,7 @@ HarvestFi/
 │   ├── HarvestToken.sol         # ERC-20 + ERC20Permit harvest token
 │   └── CropPriceOracle.sol      # Chainlink weight → USDC converter
 ├── test/
-│   └── HarvestPool.t.sol        # 6 lifecycle tests (all passing)
+│   └── HarvestPool.t.sol        # 12 lifecycle tests (all passing)
 ├── script/
 │   └── DeployHarvestPool.s.sol  # Foundry deploy script (Base Sepolia)
 ├── frontend/
@@ -169,14 +170,8 @@ forge test -vv
 ```
 
 ```
-Ran 6 tests for test/HarvestPool.t.sol:HarvestPoolTest
-[PASS] test_cancel_afterDeadline()
-[PASS] test_createContract()
-[PASS] test_invest_mintsTokensAndForwardsFunds()
-[PASS] test_revert_overfund()
-[PASS] test_revert_redeemBeforeSettled()
-[PASS] test_settle_and_redeem()
-Suite result: ok. 6 passed; 0 failed
+Ran 12 tests for test/HarvestPool.t.sol:HarvestPoolTest
+Suite result: ok; 12 passed; 0 failed
 ```
 
 ### 4. Deploy
@@ -222,16 +217,22 @@ cast send $POOL "invest(uint256,uint256)" 1 500000000 \
   --private-key $INVESTOR_KEY --rpc-url $RPC
 ```
 
-**Step 3 — Settle (Off-taker, after physical delivery)**
+**Step 3 — Approve the off-taker (Cooperative or admin)**
 ```bash
-cast send $USDC "approve(address,uint256)" $POOL 500000000 \
+cast send $POOL "setOffTaker(uint256,address)" 1 $OFFTAKER_ADDRESS \
+  --private-key $COOP_KEY --rpc-url $RPC
+```
+
+**Step 4 — Settle (Off-taker, after physical delivery)**
+```bash
+cast send $USDC "approve(address,uint256)" $POOL 560000000 \
   --private-key $OFFTAKER_KEY --rpc-url $RPC
 
-cast send $POOL "settle(uint256,uint256)" 1 500000000 \
+cast send $POOL "settle(uint256,uint256)" 1 560000000 \
   --private-key $OFFTAKER_KEY --rpc-url $RPC
 ```
 
-**Step 4 — Redeem (Investor)**
+**Step 5 — Redeem (Investor)**
 ```bash
 cast send $POOL "redeem(uint256,uint256)" 1 500000000 \
   --private-key $INVESTOR_KEY --rpc-url $RPC
@@ -241,8 +242,8 @@ cast send $POOL "redeem(uint256,uint256)" 1 500000000 \
 
 ## Key Design Decisions
 
-**Why does the farmer get USDC immediately on invest?**
-The whole purpose is upfront working capital. The farmer receives funds the same block an investor commits — there is no lockup period. Settlement is purely the investor repayment mechanism.
+**Why are investor funds held in escrow?**
+Escrow prevents a cooperative from receiving funds that cannot be returned if a round is cancelled. The approved off-taker must settle principal plus the fixed 12% premium before investors can redeem.
 
 **Why Base?**
 Near-zero gas (~$0.001/tx), native USDC, Coinbase on/off-ramps, and strong hackathon ecosystem support. Critically, fees are low enough that a Ugandan cooperative can afford to register a contract.

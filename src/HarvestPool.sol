@@ -13,29 +13,37 @@ import "./CropPriceOracle.sol";
 ///
 /// Flow:
 ///   1. Cooperative calls `createContract` → HarvestToken (hTOKEN) is deployed.
-///   2. Investors call `invest` with USDC → receive hTOKENs 1:1 (6-decimal parity).
-///   3. Off-taker calls `settle` with total USDC owed → funds enter escrow.
+///   2. Investors call `invest` with USDC → receive hTOKENs 1:1 (6-decimal parity), held in escrow.
+///   3. The approved off-taker calls `settle` with principal plus the 12% premium.
 ///   4. Token holders call `redeem` → burn hTOKENs, receive proportional USDC.
 ///
 /// All amounts in USDC's 6-decimal unit.
 contract HarvestPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    uint256 public constant YIELD_BPS = 1_200; // 12% premium over principal
+    uint256 private constant BPS_DENOMINATOR = 10_000;
+
     // ─── Data ────────────────────────────────────────────────────────────────
 
     IERC20 public immutable usdc;
 
-    enum Status { Funding, Settled, Cancelled }
+    enum Status {
+        Funding,
+        Settled,
+        Cancelled
+    }
 
     struct ForwardContract {
-        address cooperative;        // farmer cooperative address
-        HarvestToken token;         // hTOKEN for this contract
-        uint256 targetAmount;       // total USDC to raise (6 dec)
-        uint256 raisedAmount;       // USDC currently held in escrow
-        uint256 settledAmount;      // USDC paid in by off-taker
-        uint256 deadline;           // funding deadline (unix timestamp)
-        string  metadataCID;        // IPFS CID for proof-of-farm docs
-        Status  status;
+        address cooperative; // farmer cooperative address
+        address offTaker; // approved buyer responsible for settlement
+        HarvestToken token; // hTOKEN for this contract
+        uint256 targetAmount; // total USDC to raise (6 dec)
+        uint256 raisedAmount; // USDC currently held in escrow
+        uint256 settledAmount; // USDC paid in by off-taker
+        uint256 deadline; // funding deadline (unix timestamp)
+        string metadataCID; // IPFS CID for proof-of-farm docs
+        Status status;
     }
 
     uint256 public nextId;
@@ -43,10 +51,14 @@ contract HarvestPool is Ownable, ReentrancyGuard {
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
-    event ContractCreated(uint256 indexed id, address cooperative, address token, uint256 targetAmount, uint256 deadline);
+    event ContractCreated(
+        uint256 indexed id, address cooperative, address token, uint256 targetAmount, uint256 deadline
+    );
+    event OffTakerSet(uint256 indexed id, address indexed offTaker);
     event Invested(uint256 indexed id, address investor, uint256 amount);
     event Settled(uint256 indexed id, address offTaker, uint256 amount);
     event Redeemed(uint256 indexed id, address holder, uint256 tokensBurned, uint256 usdcReturned);
+    event Refunded(uint256 indexed id, address holder, uint256 tokensBurned, uint256 usdcReturned);
     event Cancelled(uint256 indexed id);
 
     // ─── Errors ──────────────────────────────────────────────────────────────
@@ -57,7 +69,13 @@ contract HarvestPool is Ownable, ReentrancyGuard {
     error DeadlineNotPassed();
     error WrongStatus();
     error Overfund();
+    error OverSettlement();
     error NoOracle();
+    error OffTakerNotSet();
+    error UnauthorizedOffTaker();
+    error FullyFunded();
+    error FundingIncomplete();
+    error FundingStarted();
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
@@ -107,17 +125,31 @@ contract HarvestPool is Ownable, ReentrancyGuard {
 
         id = nextId++;
         contracts[id] = ForwardContract({
-            cooperative:   cooperative_,
-            token:         token,
-            targetAmount:  targetAmount,
-            raisedAmount:  0,
+            cooperative: cooperative_,
+            offTaker: address(0),
+            token: token,
+            targetAmount: targetAmount,
+            raisedAmount: 0,
             settledAmount: 0,
-            deadline:      deadline,
-            metadataCID:   metadataCID,
-            status:        Status.Funding
+            deadline: deadline,
+            metadataCID: metadataCID,
+            status: Status.Funding
         });
 
         emit ContractCreated(id, cooperative_, address(token), targetAmount, deadline);
+    }
+
+    /// @notice Set the buyer allowed to settle this forward contract.
+    ///         The cooperative or pool owner must configure this before funding.
+    function setOffTaker(uint256 id, address offTaker_) external {
+        ForwardContract storage fc = contracts[id];
+        if (msg.sender != fc.cooperative && msg.sender != owner()) revert NotCooperative();
+        if (fc.status != Status.Funding) revert WrongStatus();
+        if (fc.raisedAmount != 0) revert FundingStarted();
+        if (offTaker_ == address(0)) revert InvalidAmount();
+
+        fc.offTaker = offTaker_;
+        emit OffTakerSet(id, offTaker_);
     }
 
     /// @notice Same as createContract but derives targetAmount from weight × oracle price.
@@ -130,9 +162,11 @@ contract HarvestPool is Ownable, ReentrancyGuard {
         uint256 deadline,
         string calldata metadataCID
     ) external returns (uint256 id) {
+        if (deadline <= block.timestamp) revert DeadlinePassed();
         CropPriceOracle oracle = oracles[symbol_];
         if (address(oracle) == address(0)) revert NoOracle();
         uint256 targetAmount = oracle.quoteUSDC(weightGrams);
+        if (targetAmount == 0) revert InvalidAmount();
         return _createContract(msg.sender, name_, symbol_, targetAmount, deadline, metadataCID);
     }
 
@@ -142,15 +176,13 @@ contract HarvestPool is Ownable, ReentrancyGuard {
     function invest(uint256 id, uint256 amount) external nonReentrant {
         ForwardContract storage fc = _active(id);
         if (block.timestamp > fc.deadline) revert DeadlinePassed();
+        if (fc.offTaker == address(0)) revert OffTakerNotSet();
         if (amount == 0) revert InvalidAmount();
         if (fc.raisedAmount + amount > fc.targetAmount) revert Overfund();
 
         fc.raisedAmount += amount;
         usdc.safeTransferFrom(msg.sender, address(this), amount);
         fc.token.mint(msg.sender, amount);
-
-        // Release raised funds to cooperative immediately (working capital)
-        usdc.safeTransfer(fc.cooperative, amount);
 
         emit Invested(id, msg.sender, amount);
     }
@@ -161,16 +193,26 @@ contract HarvestPool is Ownable, ReentrancyGuard {
     ///         Can be called in one or multiple tranches until fully settled.
     function settle(uint256 id, uint256 amount) external nonReentrant {
         ForwardContract storage fc = _active(id);
+        if (msg.sender != fc.offTaker) revert UnauthorizedOffTaker();
         if (amount == 0) revert InvalidAmount();
+        if (fc.raisedAmount != fc.targetAmount) revert FundingIncomplete();
+        uint256 requiredAmount = requiredSettlement(id);
+        if (fc.settledAmount + amount > requiredAmount) revert OverSettlement();
 
         fc.settledAmount += amount;
         usdc.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Mark fully settled once off-taker has paid at least the raised amount
-        if (fc.settledAmount >= fc.raisedAmount) {
+        // Redemption opens only after principal plus the fixed premium is escrowed.
+        if (fc.settledAmount == requiredAmount) {
             fc.status = Status.Settled;
             emit Settled(id, msg.sender, fc.settledAmount);
         }
+    }
+
+    /// @notice Principal plus the contract's fixed 12% repayment premium.
+    function requiredSettlement(uint256 id) public view returns (uint256) {
+        ForwardContract storage fc = contracts[id];
+        return (fc.raisedAmount * (BPS_DENOMINATOR + YIELD_BPS) + BPS_DENOMINATOR - 1) / BPS_DENOMINATOR;
     }
 
     // ─── Token Holder ────────────────────────────────────────────────────────
@@ -192,14 +234,26 @@ contract HarvestPool is Ownable, ReentrancyGuard {
         emit Redeemed(id, msg.sender, tokenAmount, usdcOut);
     }
 
+    /// @notice Return principal to a token holder when an underfunded round is cancelled.
+    function refund(uint256 id, uint256 tokenAmount) external nonReentrant {
+        ForwardContract storage fc = contracts[id];
+        if (fc.status != Status.Cancelled) revert WrongStatus();
+        if (tokenAmount == 0) revert InvalidAmount();
+
+        fc.token.burn(msg.sender, tokenAmount);
+        usdc.safeTransfer(msg.sender, tokenAmount);
+
+        emit Refunded(id, msg.sender, tokenAmount, tokenAmount);
+    }
+
     // ─── Admin ───────────────────────────────────────────────────────────────
 
-    /// @notice Cancel a funding round after deadline if underfunded (return nothing
-    ///         — funds already went to cooperative as working capital, so this
-    ///         simply marks the contract inactive to stop new investments).
+    /// @notice Cancel an underfunded round after its deadline so token holders
+    ///         can reclaim their principal from escrow.
     function cancel(uint256 id) external onlyOwner {
         ForwardContract storage fc = _active(id);
         if (block.timestamp <= fc.deadline) revert DeadlineNotPassed();
+        if (fc.raisedAmount >= fc.targetAmount) revert FullyFunded();
         fc.status = Status.Cancelled;
         emit Cancelled(id);
     }
